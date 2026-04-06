@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DevOps Todo App</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            width: 100%;
+            max-width: 500px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 20px;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        button {
+            padding: 12px 20px;
+            background: #667eea;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover { background: #5a67d8; }
+        .task-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .task-name {
+            font-size: 16px;
+        }
+        .task-name.completed {
+            text-decoration: line-through;
+            color: #888;
+        }
+        .task-actions button {
+            padding: 5px 10px;
+            margin-left: 5px;
+            font-size: 12px;
+        }
+        .complete-btn { background: #48bb78; }
+        .delete-btn { background: #f56565; }
+        .stats {
+            margin-top: 20px;
+            text-align: center;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>📋 DevOps Todo App</h1>
+        <div class="input-group">
+            <input type="text" id="taskInput" placeholder="Enter a new task...">
+            <button onclick="addTask()">Add Task</button>
+        </div>
+        <div id="taskList"></div>
+        <div class="stats" id="stats"></div>
+    </div>
+
+    <script>
+        async function loadTasks() {
+            const response = await fetch('/api/tasks');
+            const tasks = await response.json();
+            const taskList = document.getElementById('taskList');
+            const stats = document.getElementById('stats');
+            
+            const pendingTasks = tasks.filter(t => t.status === 'pending').length;
+            const completedTasks = tasks.filter(t => t.status === 'completed').length;
+            
+            stats.innerHTML = `📊 Pending: ${pendingTasks} | ✅ Completed: ${completedTasks}`;
+            
+            taskList.innerHTML = tasks.map(task => `
+                <div class="task-item">
+                    <span class="task-name ${task.status === 'completed' ? 'completed' : ''}">${task.name}</span>
+                    <div class="task-actions">
+                        ${task.status === 'pending' ? `<button class="complete-btn" onclick="completeTask(${task.id})">✓</button>` : ''}
+                        <button class="delete-btn" onclick="deleteTask(${task.id})">🗑</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function addTask() {
+            const input = document.getElementById('taskInput');
+            const name = input.value.trim();
+            if (!name) return;
+            
+            await fetch('/api/tasks', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name})
+            });
+            input.value = '';
+            loadTasks();
+        }
+
+        async function completeTask(id) {
+            await fetch(`/api/tasks/${id}/complete`, {method: 'PUT'});
+            loadTasks();
+        }
+
+        async function deleteTask(id) {
+            await fetch(`/api/tasks/${id}`, {method: 'DELETE'});
+            loadTasks();
+        }
+
+        loadTasks();
+    </script>
+</body>
+</html>
