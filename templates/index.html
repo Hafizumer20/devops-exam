@@ -90,50 +90,96 @@
     </div>
 
     <script>
+        const API_BASE = window.location.port === '5000'
+            ? window.location.origin
+            : 'http://127.0.0.1:5000';
+
+        async function fetchJson(url, options = {}) {
+            const response = await fetch(`${API_BASE}${url}`, options);
+            const contentType = response.headers.get('content-type') || '';
+
+            if (!response.ok) {
+                let errorMessage = `Request failed with status ${response.status}`;
+                if (contentType.includes('application/json')) {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } else {
+                    const responseText = await response.text();
+                    if (responseText) {
+                        errorMessage = responseText;
+                    }
+                }
+                throw new Error(errorMessage);
+            }
+
+            if (contentType.includes('application/json')) {
+                return response.json();
+            }
+
+            return null;
+        }
+
         async function loadTasks() {
-            const response = await fetch('/api/tasks');
-            const tasks = await response.json();
-            const taskList = document.getElementById('taskList');
-            const stats = document.getElementById('stats');
-            
-            const pendingTasks = tasks.filter(t => t.status === 'pending').length;
-            const completedTasks = tasks.filter(t => t.status === 'completed').length;
-            
-            stats.innerHTML = `📊 Pending: ${pendingTasks} | ✅ Completed: ${completedTasks}`;
-            
-            taskList.innerHTML = tasks.map(task => `
-                <div class="task-item">
-                    <span class="task-name ${task.status === 'completed' ? 'completed' : ''}">${task.name}</span>
-                    <div class="task-actions">
-                        ${task.status === 'pending' ? `<button class="complete-btn" onclick="completeTask(${task.id})">✓</button>` : ''}
-                        <button class="delete-btn" onclick="deleteTask(${task.id})">🗑</button>
+            try {
+                const tasks = await fetchJson('/api/tasks');
+                const safeTasks = Array.isArray(tasks) ? tasks : [];
+                const taskList = document.getElementById('taskList');
+                const stats = document.getElementById('stats');
+
+                const pendingTasks = safeTasks.filter(t => t.status === 'pending').length;
+                const completedTasks = safeTasks.filter(t => t.status === 'completed').length;
+
+                stats.innerHTML = `📊 Pending: ${pendingTasks} | ✅ Completed: ${completedTasks}`;
+
+                taskList.innerHTML = safeTasks.map(task => `
+                    <div class="task-item">
+                        <span class="task-name ${task.status === 'completed' ? 'completed' : ''}">${task.name}</span>
+                        <div class="task-actions">
+                            ${task.status === 'pending' ? `<button class="complete-btn" onclick="completeTask(${task.id})">✓</button>` : ''}
+                            <button class="delete-btn" onclick="deleteTask(${task.id})">🗑</button>
+                        </div>
                     </div>
-                </div>
-            `).join('');
+                `).join('');
+            } catch (error) {
+                document.getElementById('taskList').innerHTML = `<div class="task-item">${error.message}</div>`;
+                document.getElementById('stats').textContent = 'Unable to load tasks';
+            }
         }
 
         async function addTask() {
             const input = document.getElementById('taskInput');
             const name = input.value.trim();
             if (!name) return;
-            
-            await fetch('/api/tasks', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({name})
-            });
-            input.value = '';
-            loadTasks();
+
+            try {
+                await fetchJson('/api/tasks', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({name})
+                });
+                input.value = '';
+                loadTasks();
+            } catch (error) {
+                alert(error.message);
+            }
         }
 
         async function completeTask(id) {
-            await fetch(`/api/tasks/${id}/complete`, {method: 'PUT'});
-            loadTasks();
+            try {
+                await fetchJson(`/api/tasks/${id}/complete`, {method: 'PUT'});
+                loadTasks();
+            } catch (error) {
+                alert(error.message);
+            }
         }
 
         async function deleteTask(id) {
-            await fetch(`/api/tasks/${id}`, {method: 'DELETE'});
-            loadTasks();
+            try {
+                await fetchJson(`/api/tasks/${id}`, {method: 'DELETE'});
+                loadTasks();
+            } catch (error) {
+                alert(error.message);
+            }
         }
 
         loadTasks();
